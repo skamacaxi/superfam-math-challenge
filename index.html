@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Superfam Math Speed Challenge</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -151,7 +154,9 @@
                 this.correctAnswers = 0;
                 this.leaderboard = [];
                 this.timerInterval = null;
+                this.firebaseInitialized = false;
                 
+                this.initializeFirebase();
                 this.initializeEventListeners();
                 this.generateQuestions();
                 this.loadLeaderboard();
@@ -375,26 +380,92 @@
                 document.body.appendChild(modal);
             }
 
-            // Save leaderboard to localStorage
+            // Initialize Firebase
+            initializeFirebase() {
+                try {
+                    // Your Firebase config goes here - replace with your actual config
+                   const firebaseConfig = {
+                      apiKey: "AIzaSyC7oUqB5Wi51WXAWEujHCvKgoAnEl-FGnk",
+                      authDomain: "superfam-math-challenge.firebaseapp.com",
+                      databaseURL: "https://superfam-math-challenge-default-rtdb.asia-southeast1.firebasedatabase.app",
+                      projectId: "superfam-math-challenge",
+                      storageBucket: "superfam-math-challenge.firebasestorage.app",
+                      messagingSenderId: "436357852242",
+                      appId: "1:436357852242:web:89dc79d92d34ba2b0c438b",
+                      measurementId: "G-05VCEQ21EN"
+                    };
+
+                    // Initialize Firebase only if config is properly set
+                    if (firebaseConfig.apiKey !== "your-api-key") {
+                        firebase.initializeApp(firebaseConfig);
+                        this.database = firebase.database();
+                        this.firebaseInitialized = true;
+                        console.log('Firebase initialized successfully');
+                    } else {
+                        console.log('Firebase config not set - falling back to localStorage');
+                        this.firebaseInitialized = false;
+                    }
+                } catch (error) {
+                    console.log('Firebase initialization failed - falling back to localStorage:', error);
+                    this.firebaseInitialized = false;
+                }
+            }
+
+            // Save leaderboard to Firebase or localStorage
             saveLeaderboard() {
+                if (this.firebaseInitialized) {
+                    try {
+                        this.database.ref('leaderboard').set(this.leaderboard);
+                        console.log('Leaderboard saved to Firebase successfully');
+                    } catch (error) {
+                        console.log('Firebase save failed - falling back to localStorage:', error);
+                        this.saveToLocalStorage();
+                    }
+                } else {
+                    this.saveToLocalStorage();
+                }
+            }
+
+            // Load leaderboard from Firebase or localStorage
+            loadLeaderboard() {
+                if (this.firebaseInitialized) {
+                    try {
+                        this.database.ref('leaderboard').on('value', (snapshot) => {
+                            const data = snapshot.val();
+                            if (data && Array.isArray(data)) {
+                                this.leaderboard = data;
+                                this.updateLeaderboard();
+                                console.log('Leaderboard loaded from Firebase successfully');
+                            }
+                        });
+                    } catch (error) {
+                        console.log('Firebase load failed - falling back to localStorage:', error);
+                        this.loadFromLocalStorage();
+                    }
+                } else {
+                    this.loadFromLocalStorage();
+                }
+            }
+
+            // Fallback localStorage methods
+            saveToLocalStorage() {
                 try {
                     if (typeof(Storage) !== "undefined" && localStorage) {
                         localStorage.setItem('mathQuizLeaderboard', JSON.stringify(this.leaderboard));
-                        console.log('Leaderboard saved successfully');
+                        console.log('Leaderboard saved to localStorage successfully');
                     }
                 } catch (error) {
                     console.log('Cannot save leaderboard - localStorage not available:', error);
                 }
             }
 
-            // Load leaderboard from localStorage
-            loadLeaderboard() {
+            loadFromLocalStorage() {
                 try {
                     if (typeof(Storage) !== "undefined" && localStorage) {
                         const saved = localStorage.getItem('mathQuizLeaderboard');
                         if (saved) {
                             this.leaderboard = JSON.parse(saved);
-                            console.log('Leaderboard loaded successfully');
+                            console.log('Leaderboard loaded from localStorage successfully');
                         }
                     }
                 } catch (error) {
